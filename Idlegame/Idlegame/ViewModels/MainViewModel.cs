@@ -1,7 +1,9 @@
 using System;
 using System.Collections.ObjectModel;
 using System.Globalization;
+using System.IO;
 using System.Linq;
+using System.Windows.Threading;
 using Idlegame.Helpers;
 using Idlegame.Models;
 using Idlegame.Services;
@@ -11,13 +13,17 @@ namespace Idlegame.ViewModels
     public class MainViewModel : ObservableObject
     {
         private const int MaxLogEntries = 50;
+        private static readonly TimeSpan AutosaveInterval = TimeSpan.FromSeconds(30);
 
         private readonly GameState _gameState = new();
         private readonly GameLoopService _gameLoop;
+        private readonly SaveService _saveService = new();
+        private readonly DispatcherTimer _autosaveTimer;
 
         private string _currencyDisplay = string.Empty;
         private string _incomePerSecondDisplay = string.Empty;
         private string _clickValueDisplay = string.Empty;
+        private string _lastSavedDisplay = "Nog niet opgeslagen";
 
         public MainViewModel()
         {
@@ -25,6 +31,7 @@ namespace Idlegame.ViewModels
             _gameLoop.Tick += OnGameTick;
 
             ClickCommand = new RelayCommand(_ => OnClick());
+            SaveCommand = new RelayCommand(_ => SaveGame());
 
             Upgrades = new ObservableCollection<UpgradeViewModel>(
                 UpgradeCatalog.CreateDefault().Select(upgrade => new UpgradeViewModel(upgrade, TryPurchaseUpgrade)));
@@ -38,12 +45,18 @@ namespace Idlegame.ViewModels
 
             ActivityLog = new ObservableCollection<string>();
 
+            _autosaveTimer = new DispatcherTimer { Interval = AutosaveInterval };
+            _autosaveTimer.Tick += (_, _) => SaveGame();
+
             UpdateDisplays();
             RefreshAffordability();
             _gameLoop.Start();
+            _autosaveTimer.Start();
         }
 
         public RelayCommand ClickCommand { get; }
+
+        public RelayCommand SaveCommand { get; }
 
         public ObservableCollection<UpgradeViewModel> Upgrades { get; }
 
@@ -69,6 +82,12 @@ namespace Idlegame.ViewModels
         {
             get => _clickValueDisplay;
             private set => SetField(ref _clickValueDisplay, value);
+        }
+
+        public string LastSavedDisplay
+        {
+            get => _lastSavedDisplay;
+            private set => SetField(ref _lastSavedDisplay, value);
         }
 
         private void OnGameTick(double elapsedSeconds)
@@ -152,6 +171,35 @@ namespace Idlegame.ViewModels
 
             UpdateDisplays();
             RefreshAffordability();
+        }
+
+        private void SaveGame()
+        {
+            var data = new SaveData
+            {
+                Currency = _gameState.Currency,
+                IncomePerSecond = _gameState.IncomePerSecond,
+                ClickValue = _gameState.ClickValue,
+                PurchasedUpgradeIds = Upgrades.Where(u => u.IsPurchased).Select(u => u.Id).ToList(),
+                UnlockedAutomationIds = Automations.Where(a => a.IsUnlocked).Select(a => a.Id).ToList(),
+                ShopItemQuantities = ShopItems.ToDictionary(s => s.Id, s => s.Quantity),
+                SavedAtUtc = DateTime.UtcNow
+            };
+
+            try
+            {
+                _saveService.Save(data);
+                LastSavedDisplay = $"Laatst opgeslagen: {DateTime.Now:HH:mm:ss}";
+                AddLogEntry("Spel opgeslagen");
+            }
+            catch (IOException ex)
+            {
+                AddLogEntry($"Opslaan mislukt: {ex.Message}");
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                AddLogEntry($"Opslaan mislukt: {ex.Message}");
+            }
         }
 
         private void RefreshAffordability()
