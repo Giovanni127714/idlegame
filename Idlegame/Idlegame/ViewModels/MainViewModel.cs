@@ -16,6 +16,7 @@ namespace Idlegame.ViewModels
     {
         private const int MaxLogEntries = 50;
         private static readonly TimeSpan AutosaveInterval = TimeSpan.FromSeconds(30);
+        private static readonly TimeSpan MinOfflineNoticeDuration = TimeSpan.FromSeconds(10);
 
         private readonly GameState _gameState = new();
         private readonly GameLoopService _gameLoop;
@@ -234,6 +235,62 @@ namespace Idlegame.ViewModels
                     shopItem.SetQuantity(quantity);
                 }
             }
+
+            ApplyOfflineProgress(data.SavedAtUtc);
+        }
+
+        /// <summary>
+        /// Berekent hoe lang de speler weg was sinds de laatste save en kent
+        /// daarvoor valuta toe tegen het inkomen/sec-tarief dat gold bij het
+        /// opslaan (inclusief upgrades, winkel-items en het gemiddelde van
+        /// actieve automatiseringen). Bij een korte afwezigheid (bv. een
+        /// snelle herstart tijdens het testen) blijft het stil in de HUD en
+        /// alleen zichtbaar in het log; pas vanaf MinOfflineNoticeDuration
+        /// verschijnt ook een welkomstmelding.
+        /// </summary>
+        private void ApplyOfflineProgress(DateTime savedAtUtc)
+        {
+            TimeSpan elapsed = DateTime.UtcNow - savedAtUtc;
+            if (elapsed <= TimeSpan.Zero)
+            {
+                return;
+            }
+
+            double offlineIncomePerSecond = GetTotalIncomePerSecond();
+            double offlineEarnings = offlineIncomePerSecond * elapsed.TotalSeconds;
+            _gameState.Currency += offlineEarnings;
+
+            string durationText = FormatDuration(elapsed);
+            AddLogEntry($"Offline voortgang: {durationText} weg, +{offlineEarnings.ToString("N1", CultureInfo.InvariantCulture)} valuta verdiend");
+
+            if (elapsed >= MinOfflineNoticeDuration && offlineEarnings > 0)
+            {
+                MessageBox.Show(
+                    $"Welkom terug! Je was {durationText} weg en hebt in die tijd +{offlineEarnings.ToString("N1", CultureInfo.InvariantCulture)} valuta verdiend.",
+                    "Offline voortgang",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+            }
+        }
+
+        private static string FormatDuration(TimeSpan duration)
+        {
+            if (duration.TotalDays >= 1)
+            {
+                return $"{(int)duration.TotalDays} dag(en) en {duration.Hours} uur";
+            }
+
+            if (duration.TotalHours >= 1)
+            {
+                return $"{(int)duration.TotalHours} uur en {duration.Minutes} minuten";
+            }
+
+            if (duration.TotalMinutes >= 1)
+            {
+                return $"{(int)duration.TotalMinutes} minuten en {duration.Seconds} seconden";
+            }
+
+            return $"{(int)duration.TotalSeconds} seconden";
         }
 
         private void SaveGame()
@@ -349,15 +406,23 @@ namespace Idlegame.ViewModels
             return _gameState.IncomePerSecond + shopRate;
         }
 
-        private void UpdateDisplays()
+        /// <summary>
+        /// Doorlopend inkomen/sec plus het gemiddelde van actieve
+        /// automatiseringen (productie/interval) - het volledige tarief zoals
+        /// getoond in de HUD, en de basis voor de offline-berekening.
+        /// </summary>
+        private double GetTotalIncomePerSecond()
         {
             double automationRate = Automations
                 .Where(a => a.IsUnlocked)
                 .Sum(a => a.Model.ProductionPerTick / a.Model.IntervalSeconds);
-            double totalIncomePerSecond = GetContinuousIncomePerSecond() + automationRate;
+            return GetContinuousIncomePerSecond() + automationRate;
+        }
 
+        private void UpdateDisplays()
+        {
             CurrencyDisplay = _gameState.Currency.ToString("N1", CultureInfo.InvariantCulture);
-            IncomePerSecondDisplay = totalIncomePerSecond.ToString("N1", CultureInfo.InvariantCulture);
+            IncomePerSecondDisplay = GetTotalIncomePerSecond().ToString("N1", CultureInfo.InvariantCulture);
             ClickValueDisplay = _gameState.ClickValue.ToString("N1", CultureInfo.InvariantCulture);
         }
     }
