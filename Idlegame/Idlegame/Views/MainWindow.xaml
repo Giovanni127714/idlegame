@@ -10,9 +10,17 @@
         <vm:MainViewModel />
     </Window.DataContext>
     <Grid>
-        <TextBlock Text="{Binding StatusMessage}"
-                   HorizontalAlignment="Center"
-                   VerticalAlignment="Center"
-                   FontSize="20" />
+        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+            <TextBlock Text="{Binding CurrencyDisplay}"
+                       FontSize="36"
+                       FontWeight="Bold"
+                       HorizontalAlignment="Center" />
+            <TextBlock HorizontalAlignment="Center"
+                       FontSize="16"
+                       Margin="0,8,0,0">
+                <Run Text="{Binding IncomePerSecondDisplay, Mode=OneWay}" />
+                <Run Text=" / sec" />
+            </TextBlock>
+        </StackPanel>
     </Grid>
 </Window>
