@@ -21,6 +21,17 @@
                 <Run Text="{Binding IncomePerSecondDisplay, Mode=OneWay}" />
                 <Run Text=" / sec" />
             </TextBlock>
+            <Button Command="{Binding ClickCommand}"
+                    HorizontalAlignment="Center"
+                    Padding="24,12"
+                    FontSize="16"
+                    Margin="0,24,0,0">
+                <TextBlock>
+                    <Run Text="Klik om te produceren (+" />
+                    <Run Text="{Binding ClickValueDisplay, Mode=OneWay}" />
+                    <Run Text=")" />
+                </TextBlock>
+            </Button>
         </StackPanel>
     </Grid>
 </Window>
