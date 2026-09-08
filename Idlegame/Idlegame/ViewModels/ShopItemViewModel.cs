@@ -80,6 +80,14 @@ namespace Idlegame.ViewModels
             RefreshCostDisplay();
         }
 
+        /// <summary>Zet het aantal direct (bv. bij het laden van een save), zonder kosten te verrekenen.</summary>
+        public void SetQuantity(int quantity)
+        {
+            Model.Quantity = quantity;
+            Quantity = quantity;
+            RefreshCostDisplay();
+        }
+
         private void RefreshCostDisplay()
         {
             CostDisplay = Model.CurrentCost.ToString("N0", CultureInfo.InvariantCulture);

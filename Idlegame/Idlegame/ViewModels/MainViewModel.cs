@@ -3,6 +3,8 @@ using System.Collections.ObjectModel;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Text.Json;
+using System.Windows;
 using System.Windows.Threading;
 using Idlegame.Helpers;
 using Idlegame.Models;
@@ -47,6 +49,8 @@ namespace Idlegame.ViewModels
 
             _autosaveTimer = new DispatcherTimer { Interval = AutosaveInterval };
             _autosaveTimer.Tick += (_, _) => SaveGame();
+
+            LoadGame();
 
             UpdateDisplays();
             RefreshAffordability();
@@ -171,6 +175,65 @@ namespace Idlegame.ViewModels
 
             UpdateDisplays();
             RefreshAffordability();
+        }
+
+        private void LoadGame()
+        {
+            try
+            {
+                if (!_saveService.TryLoad(out var data) || data is null)
+                {
+                    AddLogEntry("Geen eerdere save gevonden, nieuw spel gestart");
+                    return;
+                }
+
+                ApplySaveData(data);
+                AddLogEntry($"Voortgang geladen (opgeslagen op {data.SavedAtUtc.ToLocalTime():dd-MM-yyyy HH:mm:ss})");
+            }
+            catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException)
+            {
+                // Save-bestand is corrupt of onleesbaar: GameState en collecties staan
+                // nog op hun veilige default-waarden (ApplySaveData is niet uitgevoerd),
+                // dus we gaan gewoon verder met een nieuw spel na de foutmelding.
+                AddLogEntry($"Save-bestand kon niet geladen worden ({ex.Message}). Gestart met een veilige standaardstatus.");
+                MessageBox.Show(
+                    "Het savebestand is beschadigd en kon niet geladen worden. Er is gestart met een nieuw spel.",
+                    "Laden mislukt",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+            }
+        }
+
+        private void ApplySaveData(SaveData data)
+        {
+            _gameState.Currency = data.Currency;
+            _gameState.IncomePerSecond = data.IncomePerSecond;
+            _gameState.ClickValue = data.ClickValue;
+
+            foreach (var upgrade in Upgrades)
+            {
+                if (data.PurchasedUpgradeIds.Contains(upgrade.Id))
+                {
+                    upgrade.Model.IsPurchased = true;
+                    upgrade.IsPurchased = true;
+                }
+            }
+
+            foreach (var automation in Automations)
+            {
+                if (data.UnlockedAutomationIds.Contains(automation.Id))
+                {
+                    automation.Unlock();
+                }
+            }
+
+            foreach (var shopItem in ShopItems)
+            {
+                if (data.ShopItemQuantities.TryGetValue(shopItem.Id, out int quantity))
+                {
+                    shopItem.SetQuantity(quantity);
+                }
+            }
         }
 
         private void SaveGame()

@@ -37,5 +37,27 @@ namespace Idlegame.Services
             File.WriteAllText(tempFilePath, json);
             File.Move(tempFilePath, _saveFilePath, overwrite: true);
         }
+
+        /// <summary>
+        /// Probeert de laatste save te laden. Geeft false terug als er
+        /// (nog) geen savebestand is - dat is een normale, eerste start en
+        /// geen fout. Gooit JsonException als het bestand wel bestaat maar
+        /// niet als geldige SaveData te lezen is (corrupt bestand); de
+        /// aanroeper vangt dat op om een foutmelding te tonen en met een
+        /// veilige default verder te gaan.
+        /// </summary>
+        public bool TryLoad(out SaveData? data)
+        {
+            if (!File.Exists(_saveFilePath))
+            {
+                data = null;
+                return false;
+            }
+
+            string json = File.ReadAllText(_saveFilePath);
+            data = JsonSerializer.Deserialize<SaveData>(json)
+                ?? throw new JsonException("Save-bestand bevat geen geldige spelgegevens.");
+            return true;
+        }
     }
 }
