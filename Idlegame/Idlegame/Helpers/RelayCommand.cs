@@ -14,14 +14,15 @@ namespace Idlegame.Helpers
             _canExecute = canExecute;
         }
 
-        public event EventHandler? CanExecuteChanged
-        {
-            add => CommandManager.RequerySuggested += value;
-            remove => CommandManager.RequerySuggested -= value;
-        }
+        // Eigen event i.p.v. CommandManager.RequerySuggested: onze CanExecute-state
+        // verandert door een achtergrond-timer (game loop), niet door UI-input, dus
+        // moet expliciet ongeldig gemaakt worden via RaiseCanExecuteChanged().
+        public event EventHandler? CanExecuteChanged;
 
         public bool CanExecute(object? parameter) => _canExecute?.Invoke(parameter) ?? true;
 
         public void Execute(object? parameter) => _execute(parameter);
+
+        public void RaiseCanExecuteChanged() => CanExecuteChanged?.Invoke(this, EventArgs.Empty);
     }
 }

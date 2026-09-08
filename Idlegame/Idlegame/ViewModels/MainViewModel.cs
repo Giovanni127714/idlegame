@@ -1,4 +1,6 @@
+using System.Collections.ObjectModel;
 using System.Globalization;
+using System.Linq;
 using Idlegame.Helpers;
 using Idlegame.Models;
 using Idlegame.Services;
@@ -21,11 +23,17 @@ namespace Idlegame.ViewModels
 
             ClickCommand = new RelayCommand(_ => OnClick());
 
+            Upgrades = new ObservableCollection<UpgradeViewModel>(
+                UpgradeCatalog.CreateDefault().Select(upgrade => new UpgradeViewModel(upgrade, TryPurchaseUpgrade)));
+
             UpdateDisplays();
+            RefreshUpgradeStates();
             _gameLoop.Start();
         }
 
         public RelayCommand ClickCommand { get; }
+
+        public ObservableCollection<UpgradeViewModel> Upgrades { get; }
 
         public string CurrencyDisplay
         {
@@ -49,12 +57,68 @@ namespace Idlegame.ViewModels
         {
             _gameState.Currency += _gameState.IncomePerSecond * elapsedSeconds;
             UpdateDisplays();
+            RefreshUpgradeStates();
         }
 
         private void OnClick()
         {
             _gameState.Currency += _gameState.ClickValue;
             UpdateDisplays();
+            RefreshUpgradeStates();
+        }
+
+        private void TryPurchaseUpgrade(UpgradeViewModel upgrade)
+        {
+            if (!upgrade.CanPurchase)
+            {
+                return;
+            }
+
+            _gameState.Currency -= upgrade.Model.Cost;
+
+            switch (upgrade.Model.EffectType)
+            {
+                case UpgradeEffectType.IncomePerSecond:
+                    _gameState.IncomePerSecond += upgrade.Model.EffectAmount;
+                    break;
+                case UpgradeEffectType.ClickValue:
+                    _gameState.ClickValue += upgrade.Model.EffectAmount;
+                    break;
+            }
+
+            upgrade.Model.IsPurchased = true;
+            upgrade.IsPurchased = true;
+
+            UpdateDisplays();
+            RefreshUpgradeStates();
+        }
+
+        private void RefreshUpgradeStates()
+        {
+            foreach (var upgrade in Upgrades)
+            {
+                if (upgrade.IsPurchased)
+                {
+                    upgrade.CanPurchase = false;
+                    upgrade.StatusText = "Gekocht";
+                    continue;
+                }
+
+                bool requirementMet = upgrade.RequiresUpgradeId is null
+                    || Upgrades.First(u => u.Id == upgrade.RequiresUpgradeId).IsPurchased;
+
+                if (!requirementMet)
+                {
+                    var requiredUpgrade = Upgrades.First(u => u.Id == upgrade.RequiresUpgradeId);
+                    upgrade.CanPurchase = false;
+                    upgrade.StatusText = $"Vereist: {requiredUpgrade.Name}";
+                    continue;
+                }
+
+                bool canAfford = _gameState.Currency >= upgrade.Model.Cost;
+                upgrade.CanPurchase = canAfford;
+                upgrade.StatusText = canAfford ? string.Empty : "Onvoldoende valuta";
+            }
         }
 
         private void UpdateDisplays()

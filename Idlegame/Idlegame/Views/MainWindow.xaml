@@ -5,12 +5,17 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:vm="clr-namespace:Idlegame.ViewModels"
         mc:Ignorable="d"
-        Title="Idlegame" Height="450" Width="800">
+        Title="Idlegame" Height="500" Width="850">
     <Window.DataContext>
         <vm:MainViewModel />
     </Window.DataContext>
-    <Grid>
-        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+    <Grid Margin="16">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="280" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <StackPanel Grid.Column="0" VerticalAlignment="Center" HorizontalAlignment="Center">
             <TextBlock Text="{Binding CurrencyDisplay}"
                        FontSize="36"
                        FontWeight="Bold"
@@ -33,5 +38,43 @@
                 </TextBlock>
             </Button>
         </StackPanel>
+
+        <DockPanel Grid.Column="1" Margin="16,0,0,0">
+            <TextBlock DockPanel.Dock="Top" Text="Upgrades" FontSize="20" FontWeight="Bold" Margin="0,0,0,8" />
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <ItemsControl ItemsSource="{Binding Upgrades}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="4" Padding="10" Margin="0,0,0,8">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="{Binding Name}" FontWeight="Bold" FontSize="14" />
+                                        <TextBlock Text="{Binding Description}" FontSize="12" Opacity="0.8" TextWrapping="Wrap" />
+                                        <TextBlock FontSize="12" Margin="0,4,0,0">
+                                            <Run Text="Prijs: " />
+                                            <Run Text="{Binding CostDisplay, Mode=OneWay}" />
+                                            <Run Text="  |  Effect: " />
+                                            <Run Text="{Binding EffectDisplay, Mode=OneWay}" />
+                                        </TextBlock>
+                                        <TextBlock Text="{Binding StatusText}" FontSize="11" Foreground="Gray" Margin="0,2,0,0" />
+                                    </StackPanel>
+                                    <Button Grid.Column="1"
+                                            Content="Koop"
+                                            Command="{Binding BuyCommand}"
+                                            AutomationProperties.Name="{Binding Name, StringFormat='Koop {0}'}"
+                                            VerticalAlignment="Center"
+                                            Padding="12,6"
+                                            Margin="10,0,0,0" />
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </DockPanel>
     </Grid>
 </Window>
