@@ -1,3 +1,4 @@
+using System;
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Linq;
@@ -9,6 +10,8 @@ namespace Idlegame.ViewModels
 {
     public class MainViewModel : ObservableObject
     {
+        private const int MaxLogEntries = 50;
+
         private readonly GameState _gameState = new();
         private readonly GameLoopService _gameLoop;
 
@@ -26,14 +29,24 @@ namespace Idlegame.ViewModels
             Upgrades = new ObservableCollection<UpgradeViewModel>(
                 UpgradeCatalog.CreateDefault().Select(upgrade => new UpgradeViewModel(upgrade, TryPurchaseUpgrade)));
 
+            Automations = new ObservableCollection<AutomationViewModel>(
+                AutomationCatalog.CreateDefault().Select(automation =>
+                    new AutomationViewModel(automation, TryPurchaseAutomation, OnAutomationProduce)));
+
+            ActivityLog = new ObservableCollection<string>();
+
             UpdateDisplays();
-            RefreshUpgradeStates();
+            RefreshAffordability();
             _gameLoop.Start();
         }
 
         public RelayCommand ClickCommand { get; }
 
         public ObservableCollection<UpgradeViewModel> Upgrades { get; }
+
+        public ObservableCollection<AutomationViewModel> Automations { get; }
+
+        public ObservableCollection<string> ActivityLog { get; }
 
         public string CurrencyDisplay
         {
@@ -57,14 +70,23 @@ namespace Idlegame.ViewModels
         {
             _gameState.Currency += _gameState.IncomePerSecond * elapsedSeconds;
             UpdateDisplays();
-            RefreshUpgradeStates();
+            RefreshAffordability();
         }
 
         private void OnClick()
         {
             _gameState.Currency += _gameState.ClickValue;
             UpdateDisplays();
-            RefreshUpgradeStates();
+            RefreshAffordability();
+        }
+
+        private void OnAutomationProduce(AutomationViewModel automation)
+        {
+            _gameState.Currency += automation.Model.ProductionPerTick;
+            AddLogEntry($"{automation.Name} produceerde +{automation.Model.ProductionPerTick.ToString("N1", CultureInfo.InvariantCulture)}");
+
+            UpdateDisplays();
+            RefreshAffordability();
         }
 
         private void TryPurchaseUpgrade(UpgradeViewModel upgrade)
@@ -89,8 +111,32 @@ namespace Idlegame.ViewModels
             upgrade.Model.IsPurchased = true;
             upgrade.IsPurchased = true;
 
+            AddLogEntry($"Upgrade '{upgrade.Name}' gekocht");
+
             UpdateDisplays();
+            RefreshAffordability();
+        }
+
+        private void TryPurchaseAutomation(AutomationViewModel automation)
+        {
+            if (!automation.CanPurchase)
+            {
+                return;
+            }
+
+            _gameState.Currency -= automation.Model.Cost;
+            automation.Unlock();
+
+            AddLogEntry($"Automatisering '{automation.Name}' ontgrendeld");
+
+            UpdateDisplays();
+            RefreshAffordability();
+        }
+
+        private void RefreshAffordability()
+        {
             RefreshUpgradeStates();
+            RefreshAutomationStates();
         }
 
         private void RefreshUpgradeStates()
@@ -121,10 +167,42 @@ namespace Idlegame.ViewModels
             }
         }
 
+        private void RefreshAutomationStates()
+        {
+            foreach (var automation in Automations)
+            {
+                if (automation.IsUnlocked)
+                {
+                    automation.CanPurchase = false;
+                    automation.StatusText = "Actief";
+                    continue;
+                }
+
+                bool canAfford = _gameState.Currency >= automation.Model.Cost;
+                automation.CanPurchase = canAfford;
+                automation.StatusText = canAfford ? string.Empty : "Onvoldoende valuta";
+            }
+        }
+
+        private void AddLogEntry(string message)
+        {
+            ActivityLog.Insert(0, $"{DateTime.Now:HH:mm:ss} - {message}");
+
+            while (ActivityLog.Count > MaxLogEntries)
+            {
+                ActivityLog.RemoveAt(ActivityLog.Count - 1);
+            }
+        }
+
         private void UpdateDisplays()
         {
+            double automationRate = Automations
+                .Where(a => a.IsUnlocked)
+                .Sum(a => a.Model.ProductionPerTick / a.Model.IntervalSeconds);
+            double totalIncomePerSecond = _gameState.IncomePerSecond + automationRate;
+
             CurrencyDisplay = _gameState.Currency.ToString("N1", CultureInfo.InvariantCulture);
-            IncomePerSecondDisplay = _gameState.IncomePerSecond.ToString("N1", CultureInfo.InvariantCulture);
+            IncomePerSecondDisplay = totalIncomePerSecond.ToString("N1", CultureInfo.InvariantCulture);
             ClickValueDisplay = _gameState.ClickValue.ToString("N1", CultureInfo.InvariantCulture);
         }
     }

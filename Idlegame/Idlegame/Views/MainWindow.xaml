@@ -5,13 +5,14 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:vm="clr-namespace:Idlegame.ViewModels"
         mc:Ignorable="d"
-        Title="Idlegame" Height="500" Width="850">
+        Title="Idlegame" Height="560" Width="1200">
     <Window.DataContext>
         <vm:MainViewModel />
     </Window.DataContext>
     <Grid Margin="16">
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="280" />
+            <ColumnDefinition Width="260" />
+            <ColumnDefinition Width="*" />
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
 
@@ -75,6 +76,57 @@
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
             </ScrollViewer>
+        </DockPanel>
+
+        <DockPanel Grid.Column="2" Margin="16,0,0,0">
+            <TextBlock DockPanel.Dock="Top" Text="Automatiseringen" FontSize="20" FontWeight="Bold" Margin="0,0,0,8" />
+            <ScrollViewer DockPanel.Dock="Top" MaxHeight="220" VerticalScrollBarVisibility="Auto">
+                <ItemsControl ItemsSource="{Binding Automations}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="4" Padding="10" Margin="0,0,0,8">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="{Binding Name}" FontWeight="Bold" FontSize="14" />
+                                        <TextBlock Text="{Binding Description}" FontSize="12" Opacity="0.8" TextWrapping="Wrap" />
+                                        <TextBlock FontSize="12" Margin="0,4,0,0">
+                                            <Run Text="Prijs: " />
+                                            <Run Text="{Binding CostDisplay, Mode=OneWay}" />
+                                            <Run Text="  |  Productie: " />
+                                            <Run Text="{Binding ProductionDisplay, Mode=OneWay}" />
+                                        </TextBlock>
+                                        <TextBlock Text="{Binding StatusText}" FontSize="11" Foreground="Gray" Margin="0,2,0,0" />
+                                    </StackPanel>
+                                    <Button Grid.Column="1"
+                                            Content="Koop"
+                                            Command="{Binding BuyCommand}"
+                                            AutomationProperties.Name="{Binding Name, StringFormat='Koop {0}'}"
+                                            VerticalAlignment="Center"
+                                            Padding="12,6"
+                                            Margin="10,0,0,0" />
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+
+            <TextBlock DockPanel.Dock="Top" Text="Log" FontSize="16" FontWeight="Bold" Margin="0,16,0,8" />
+            <Border BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="4" Padding="8">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <ItemsControl ItemsSource="{Binding ActivityLog}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding}" FontSize="11" FontFamily="Consolas" Margin="0,0,0,2" />
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </Border>
         </DockPanel>
     </Grid>
 </Window>
