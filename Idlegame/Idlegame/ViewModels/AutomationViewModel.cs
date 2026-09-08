@@ -91,5 +91,13 @@ namespace Idlegame.ViewModels
             IsUnlocked = true;
             _timer.Start();
         }
+
+        /// <summary>Stopt de timer en zet terug naar ongekocht (gebruikt bij prestige).</summary>
+        public void ResetToLocked()
+        {
+            _timer.Stop();
+            Model.IsUnlocked = false;
+            IsUnlocked = false;
+        }
     }
 }

@@ -13,9 +13,13 @@ namespace Idlegame.Models
     {
         public double Currency { get; set; }
 
+        public double TotalEarned { get; set; }
+
         public double IncomePerSecond { get; set; }
 
         public double ClickValue { get; set; }
+
+        public int PrestigePoints { get; set; }
 
         public List<string> PurchasedUpgradeIds { get; set; } = new();
 

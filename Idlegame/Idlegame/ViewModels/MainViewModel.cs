@@ -15,6 +15,7 @@ namespace Idlegame.ViewModels
     public class MainViewModel : ObservableObject
     {
         private const int MaxLogEntries = 50;
+        private const double PrestigeThreshold = 1000.0;
         private static readonly TimeSpan AutosaveInterval = TimeSpan.FromSeconds(30);
         private static readonly TimeSpan MinOfflineNoticeDuration = TimeSpan.FromSeconds(10);
 
@@ -27,6 +28,10 @@ namespace Idlegame.ViewModels
         private string _incomePerSecondDisplay = string.Empty;
         private string _clickValueDisplay = string.Empty;
         private string _lastSavedDisplay = "Nog niet opgeslagen";
+        private string _prestigePointsDisplay = string.Empty;
+        private string _prestigeMultiplierDisplay = string.Empty;
+        private string _prestigeAvailableDisplay = string.Empty;
+        private bool _canPrestige;
 
         public MainViewModel()
         {
@@ -35,6 +40,7 @@ namespace Idlegame.ViewModels
 
             ClickCommand = new RelayCommand(_ => OnClick());
             SaveCommand = new RelayCommand(_ => SaveGame());
+            PrestigeCommand = new RelayCommand(_ => TryPrestige(), _ => CanPrestige);
 
             Upgrades = new ObservableCollection<UpgradeViewModel>(
                 UpgradeCatalog.CreateDefault().Select(upgrade => new UpgradeViewModel(upgrade, TryPurchaseUpgrade)));
@@ -62,6 +68,8 @@ namespace Idlegame.ViewModels
         public RelayCommand ClickCommand { get; }
 
         public RelayCommand SaveCommand { get; }
+
+        public RelayCommand PrestigeCommand { get; }
 
         public ObservableCollection<UpgradeViewModel> Upgrades { get; }
 
@@ -95,24 +103,60 @@ namespace Idlegame.ViewModels
             private set => SetField(ref _lastSavedDisplay, value);
         }
 
+        public string PrestigePointsDisplay
+        {
+            get => _prestigePointsDisplay;
+            private set => SetField(ref _prestigePointsDisplay, value);
+        }
+
+        public string PrestigeMultiplierDisplay
+        {
+            get => _prestigeMultiplierDisplay;
+            private set => SetField(ref _prestigeMultiplierDisplay, value);
+        }
+
+        public string PrestigeAvailableDisplay
+        {
+            get => _prestigeAvailableDisplay;
+            private set => SetField(ref _prestigeAvailableDisplay, value);
+        }
+
+        public bool CanPrestige
+        {
+            get => _canPrestige;
+            private set
+            {
+                if (SetField(ref _canPrestige, value))
+                {
+                    PrestigeCommand.RaiseCanExecuteChanged();
+                }
+            }
+        }
+
         private void OnGameTick(double elapsedSeconds)
         {
-            _gameState.Currency += GetContinuousIncomePerSecond() * elapsedSeconds;
+            double amount = GetContinuousIncomePerSecond() * elapsedSeconds;
+            _gameState.Currency += amount;
+            _gameState.TotalEarned += amount;
             UpdateDisplays();
             RefreshAffordability();
         }
 
         private void OnClick()
         {
-            _gameState.Currency += _gameState.ClickValue;
+            double amount = _gameState.ClickValue * _gameState.PrestigeMultiplier;
+            _gameState.Currency += amount;
+            _gameState.TotalEarned += amount;
             UpdateDisplays();
             RefreshAffordability();
         }
 
         private void OnAutomationProduce(AutomationViewModel automation)
         {
-            _gameState.Currency += automation.Model.ProductionPerTick;
-            AddLogEntry($"{automation.Name} produceerde +{automation.Model.ProductionPerTick.ToString("N1", CultureInfo.InvariantCulture)}");
+            double amount = automation.Model.ProductionPerTick * _gameState.PrestigeMultiplier;
+            _gameState.Currency += amount;
+            _gameState.TotalEarned += amount;
+            AddLogEntry($"{automation.Name} produceerde +{amount.ToString("N1", CultureInfo.InvariantCulture)}");
 
             UpdateDisplays();
             RefreshAffordability();
@@ -208,8 +252,10 @@ namespace Idlegame.ViewModels
         private void ApplySaveData(SaveData data)
         {
             _gameState.Currency = data.Currency;
+            _gameState.TotalEarned = data.TotalEarned;
             _gameState.IncomePerSecond = data.IncomePerSecond;
             _gameState.ClickValue = data.ClickValue;
+            _gameState.PrestigePoints = data.PrestigePoints;
 
             foreach (var upgrade in Upgrades)
             {
@@ -259,6 +305,7 @@ namespace Idlegame.ViewModels
             double offlineIncomePerSecond = GetTotalIncomePerSecond();
             double offlineEarnings = offlineIncomePerSecond * elapsed.TotalSeconds;
             _gameState.Currency += offlineEarnings;
+            _gameState.TotalEarned += offlineEarnings;
 
             string durationText = FormatDuration(elapsed);
             AddLogEntry($"Offline voortgang: {durationText} weg, +{offlineEarnings.ToString("N1", CultureInfo.InvariantCulture)} valuta verdiend");
@@ -298,8 +345,10 @@ namespace Idlegame.ViewModels
             var data = new SaveData
             {
                 Currency = _gameState.Currency,
+                TotalEarned = _gameState.TotalEarned,
                 IncomePerSecond = _gameState.IncomePerSecond,
                 ClickValue = _gameState.ClickValue,
+                PrestigePoints = _gameState.PrestigePoints,
                 PurchasedUpgradeIds = Upgrades.Where(u => u.IsPurchased).Select(u => u.Id).ToList(),
                 UnlockedAutomationIds = Automations.Where(a => a.IsUnlocked).Select(a => a.Id).ToList(),
                 ShopItemQuantities = ShopItems.ToDictionary(s => s.Id, s => s.Quantity),
@@ -322,11 +371,87 @@ namespace Idlegame.ViewModels
             }
         }
 
+        /// <summary>
+        /// Aantal prestigepunten dat de speler nu zou krijgen bij het
+        /// prestigen, gebaseerd op de ooit-verdiende valuta (niet de
+        /// huidige, uitgeefbare valuta - anders zou uitgeven vlak voor
+        /// prestige lonen). Vierkantswortel-schaal zodat elk volgend punt
+        /// meer moeite kost, wat herhaald prestigen zinvol maakt.
+        /// </summary>
+        private int GetAvailablePrestigePoints()
+        {
+            if (_gameState.TotalEarned < PrestigeThreshold)
+            {
+                return 0;
+            }
+
+            return (int)Math.Floor(Math.Sqrt(_gameState.TotalEarned / PrestigeThreshold));
+        }
+
+        private void TryPrestige()
+        {
+            int availablePoints = GetAvailablePrestigePoints();
+            if (availablePoints < 1)
+            {
+                return;
+            }
+
+            int newTotal = _gameState.PrestigePoints + availablePoints;
+            var confirm = MessageBox.Show(
+                Application.Current.MainWindow,
+                $"Je krijgt {availablePoints} ster(ren) en start opnieuw vanaf de basis: valuta, upgrades, " +
+                "automatiseringen en de winkel worden gereset. Je totaal aantal sterren wordt " +
+                $"{newTotal}, wat een permanente inkomensbonus van +{newTotal * 10}% geeft.\n\nDoorgaan?",
+                "Prestige",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+
+            if (confirm != MessageBoxResult.Yes)
+            {
+                return;
+            }
+
+            _gameState.PrestigePoints = newTotal;
+            _gameState.Currency = 0;
+            _gameState.TotalEarned = 0;
+            _gameState.IncomePerSecond = GameState.BaseIncomePerSecond;
+            _gameState.ClickValue = GameState.BaseClickValue;
+
+            foreach (var upgrade in Upgrades)
+            {
+                upgrade.Model.IsPurchased = false;
+                upgrade.IsPurchased = false;
+            }
+
+            foreach (var automation in Automations)
+            {
+                automation.ResetToLocked();
+            }
+
+            foreach (var shopItem in ShopItems)
+            {
+                shopItem.SetQuantity(0);
+            }
+
+            AddLogEntry($"Prestige uitgevoerd: +{availablePoints} ster(ren) (totaal: {newTotal}, bonus: +{newTotal * 10}%)");
+
+            UpdateDisplays();
+            RefreshAffordability();
+        }
+
         private void RefreshAffordability()
         {
             RefreshUpgradeStates();
             RefreshAutomationStates();
             RefreshShopStates();
+            RefreshPrestigeState();
+        }
+
+        private void RefreshPrestigeState()
+        {
+            int availablePoints = GetAvailablePrestigePoints();
+            CanPrestige = availablePoints >= 1;
+            PrestigeAvailableDisplay = availablePoints.ToString(CultureInfo.InvariantCulture);
         }
 
         private void RefreshUpgradeStates()
@@ -396,26 +521,27 @@ namespace Idlegame.ViewModels
 
         /// <summary>
         /// Inkomen/sec dat doorlopend (elke gameloop-tick) wordt bijgeteld:
-        /// basisinkomen + upgrades + bezeten winkel-items. Automatiseringen
-        /// tellen hier niet in mee, want die produceren discreet op hun eigen
-        /// timer (zie OnAutomationProduce).
+        /// (basisinkomen + upgrades + bezeten winkel-items) * prestige-
+        /// vermenigvuldiger. Automatiseringen tellen hier niet in mee, want
+        /// die produceren discreet op hun eigen timer (zie OnAutomationProduce).
         /// </summary>
         private double GetContinuousIncomePerSecond()
         {
             double shopRate = ShopItems.Sum(s => s.Model.Quantity * s.Model.IncomePerSecondPerUnit);
-            return _gameState.IncomePerSecond + shopRate;
+            return (_gameState.IncomePerSecond + shopRate) * _gameState.PrestigeMultiplier;
         }
 
         /// <summary>
         /// Doorlopend inkomen/sec plus het gemiddelde van actieve
-        /// automatiseringen (productie/interval) - het volledige tarief zoals
-        /// getoond in de HUD, en de basis voor de offline-berekening.
+        /// automatiseringen (productie/interval), beide al vermenigvuldigd
+        /// met de prestige-bonus - het volledige tarief zoals getoond in de
+        /// HUD, en de basis voor de offline-berekening.
         /// </summary>
         private double GetTotalIncomePerSecond()
         {
             double automationRate = Automations
                 .Where(a => a.IsUnlocked)
-                .Sum(a => a.Model.ProductionPerTick / a.Model.IntervalSeconds);
+                .Sum(a => a.Model.ProductionPerTick / a.Model.IntervalSeconds) * _gameState.PrestigeMultiplier;
             return GetContinuousIncomePerSecond() + automationRate;
         }
 
@@ -423,7 +549,9 @@ namespace Idlegame.ViewModels
         {
             CurrencyDisplay = _gameState.Currency.ToString("N1", CultureInfo.InvariantCulture);
             IncomePerSecondDisplay = GetTotalIncomePerSecond().ToString("N1", CultureInfo.InvariantCulture);
-            ClickValueDisplay = _gameState.ClickValue.ToString("N1", CultureInfo.InvariantCulture);
+            ClickValueDisplay = (_gameState.ClickValue * _gameState.PrestigeMultiplier).ToString("N1", CultureInfo.InvariantCulture);
+            PrestigePointsDisplay = _gameState.PrestigePoints.ToString(CultureInfo.InvariantCulture);
+            PrestigeMultiplierDisplay = "x" + _gameState.PrestigeMultiplier.ToString("N2", CultureInfo.InvariantCulture);
         }
     }
 }
