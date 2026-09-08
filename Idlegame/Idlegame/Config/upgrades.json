@@ -1,0 +1,38 @@
+[
+  {
+    "Id": "snellere-vingers",
+    "Name": "Snellere vingers",
+    "Description": "Verhoogt de waarde van je klik.",
+    "Cost": 10,
+    "EffectType": "ClickValue",
+    "EffectAmount": 0.5,
+    "RequiresUpgradeId": null
+  },
+  {
+    "Id": "extra-medewerker",
+    "Name": "Extra medewerker",
+    "Description": "Verhoogt je inkomen per seconde.",
+    "Cost": 25,
+    "EffectType": "IncomePerSecond",
+    "EffectAmount": 1.0,
+    "RequiresUpgradeId": null
+  },
+  {
+    "Id": "efficiente-tools",
+    "Name": "Efficiënte tools",
+    "Description": "Verhoogt de waarde van je klik nog verder.",
+    "Cost": 100,
+    "EffectType": "ClickValue",
+    "EffectAmount": 1.0,
+    "RequiresUpgradeId": "snellere-vingers"
+  },
+  {
+    "Id": "automatisering-boost",
+    "Name": "Automatisering-boost",
+    "Description": "Verhoogt je inkomen per seconde flink.",
+    "Cost": 250,
+    "EffectType": "IncomePerSecond",
+    "EffectAmount": 5.0,
+    "RequiresUpgradeId": "extra-medewerker"
+  }
+]

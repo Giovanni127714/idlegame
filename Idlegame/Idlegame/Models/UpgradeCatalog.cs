@@ -1,15 +1,37 @@
+using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Text.Json;
+using Idlegame.Services;
 
 namespace Idlegame.Models
 {
     /// <summary>
-    /// Bron van de beschikbare upgrades. Voor nu hardcoded; kan later worden
-    /// vervangen door een JSON-config zonder dat de consumers hoeven te
-    /// veranderen.
+    /// Bron van de beschikbare upgrades: leest Config/upgrades.json, zodat
+    /// upgrades aangepast kunnen worden zonder te hercompileren. Bij een
+    /// ontbrekend of corrupt bestand valt dit terug op een kleine ingebouwde
+    /// standaardset, net als de veilige-default-aanpak bij een corrupt
+    /// savebestand.
     /// </summary>
     public static class UpgradeCatalog
     {
-        public static List<Upgrade> CreateDefault()
+        public static bool TryLoad(out List<Upgrade> upgrades, out string? error)
+        {
+            try
+            {
+                upgrades = ContentLoader.LoadList<Upgrade>("upgrades.json");
+                error = null;
+                return true;
+            }
+            catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException)
+            {
+                upgrades = CreateFallbackDefaults();
+                error = ex.Message;
+                return false;
+            }
+        }
+
+        private static List<Upgrade> CreateFallbackDefaults()
         {
             return new List<Upgrade>
             {
@@ -30,26 +52,6 @@ namespace Idlegame.Models
                     Cost = 25,
                     EffectType = UpgradeEffectType.IncomePerSecond,
                     EffectAmount = 1.0
-                },
-                new Upgrade
-                {
-                    Id = "efficiente-tools",
-                    Name = "Efficiënte tools",
-                    Description = "Verhoogt de waarde van je klik nog verder.",
-                    Cost = 100,
-                    EffectType = UpgradeEffectType.ClickValue,
-                    EffectAmount = 1.0,
-                    RequiresUpgradeId = "snellere-vingers"
-                },
-                new Upgrade
-                {
-                    Id = "automatisering-boost",
-                    Name = "Automatisering-boost",
-                    Description = "Verhoogt je inkomen per seconde flink.",
-                    Cost = 250,
-                    EffectType = UpgradeEffectType.IncomePerSecond,
-                    EffectAmount = 5.0,
-                    RequiresUpgradeId = "extra-medewerker"
                 }
             };
         }

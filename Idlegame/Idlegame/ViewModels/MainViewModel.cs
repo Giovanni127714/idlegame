@@ -42,17 +42,32 @@ namespace Idlegame.ViewModels
             SaveCommand = new RelayCommand(_ => SaveGame());
             PrestigeCommand = new RelayCommand(_ => TryPrestige(), _ => CanPrestige);
 
+            ActivityLog = new ObservableCollection<string>();
+
+            if (!UpgradeCatalog.TryLoad(out var upgradeModels, out var upgradeError))
+            {
+                AddLogEntry($"Upgrades-config kon niet geladen worden ({upgradeError}); standaard upgrades gebruikt.");
+            }
+
             Upgrades = new ObservableCollection<UpgradeViewModel>(
-                UpgradeCatalog.CreateDefault().Select(upgrade => new UpgradeViewModel(upgrade, TryPurchaseUpgrade)));
+                upgradeModels.Select(upgrade => new UpgradeViewModel(upgrade, TryPurchaseUpgrade)));
+
+            if (!AutomationCatalog.TryLoad(out var automationModels, out var automationError))
+            {
+                AddLogEntry($"Automatiseringen-config kon niet geladen worden ({automationError}); standaard automatiseringen gebruikt.");
+            }
 
             Automations = new ObservableCollection<AutomationViewModel>(
-                AutomationCatalog.CreateDefault().Select(automation =>
+                automationModels.Select(automation =>
                     new AutomationViewModel(automation, TryPurchaseAutomation, OnAutomationProduce)));
 
-            ShopItems = new ObservableCollection<ShopItemViewModel>(
-                ShopCatalog.CreateDefault().Select(shopItem => new ShopItemViewModel(shopItem, TryPurchaseShopItem)));
+            if (!ShopCatalog.TryLoad(out var shopModels, out var shopError))
+            {
+                AddLogEntry($"Winkel-config kon niet geladen worden ({shopError}); standaard winkel-items gebruikt.");
+            }
 
-            ActivityLog = new ObservableCollection<string>();
+            ShopItems = new ObservableCollection<ShopItemViewModel>(
+                shopModels.Select(shopItem => new ShopItemViewModel(shopItem, TryPurchaseShopItem)));
 
             _autosaveTimer = new DispatcherTimer { Interval = AutosaveInterval };
             _autosaveTimer.Tick += (_, _) => SaveGame();

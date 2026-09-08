@@ -1,0 +1,18 @@
+[
+  {
+    "Id": "auto-klikker",
+    "Name": "Auto-klikker",
+    "Description": "Klikt automatisch voor je, zodat je zelf niet meer hoeft te klikken.",
+    "Cost": 50,
+    "ProductionPerTick": 1.0,
+    "IntervalSeconds": 3.0
+  },
+  {
+    "Id": "robotarm",
+    "Name": "Robotarm",
+    "Description": "Een krachtige arm die in hoog tempo grote hoeveelheden produceert.",
+    "Cost": 300,
+    "ProductionPerTick": 5.0,
+    "IntervalSeconds": 4.0
+  }
+]

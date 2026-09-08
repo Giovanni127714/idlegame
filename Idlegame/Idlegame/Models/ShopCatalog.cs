@@ -1,14 +1,35 @@
+using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Text.Json;
+using Idlegame.Services;
 
 namespace Idlegame.Models
 {
     /// <summary>
-    /// Bron van de beschikbare winkel-items. Voorlopig hardcoded, zoals de
-    /// andere catalogi.
+    /// Bron van de beschikbare winkel-items: leest Config/shop.json, met
+    /// dezelfde fallback-aanpak als UpgradeCatalog bij een ontbrekend of
+    /// corrupt bestand.
     /// </summary>
     public static class ShopCatalog
     {
-        public static List<ShopItem> CreateDefault()
+        public static bool TryLoad(out List<ShopItem> shopItems, out string? error)
+        {
+            try
+            {
+                shopItems = ContentLoader.LoadList<ShopItem>("shop.json");
+                error = null;
+                return true;
+            }
+            catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException)
+            {
+                shopItems = CreateFallbackDefaults();
+                error = ex.Message;
+                return false;
+            }
+        }
+
+        private static List<ShopItem> CreateFallbackDefaults()
         {
             return new List<ShopItem>
             {
@@ -20,24 +41,6 @@ namespace Idlegame.Models
                     BaseCost = 15,
                     CostMultiplier = 1.15,
                     IncomePerSecondPerUnit = 0.1
-                },
-                new ShopItem
-                {
-                    Id = "foodtruck",
-                    Name = "Foodtruck",
-                    Description = "Rijdt rond en verkoopt aan meer klanten tegelijk.",
-                    BaseCost = 100,
-                    CostMultiplier = 1.15,
-                    IncomePerSecondPerUnit = 1.0
-                },
-                new ShopItem
-                {
-                    Id = "fabriek",
-                    Name = "Fabriek",
-                    Description = "Grootschalige productie voor de late game.",
-                    BaseCost = 1100,
-                    CostMultiplier = 1.15,
-                    IncomePerSecondPerUnit = 8.0
                 }
             };
         }

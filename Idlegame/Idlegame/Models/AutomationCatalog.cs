@@ -1,14 +1,35 @@
+using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Text.Json;
+using Idlegame.Services;
 
 namespace Idlegame.Models
 {
     /// <summary>
-    /// Bron van de beschikbare automatiseringen. Voorlopig hardcoded, zoals
-    /// UpgradeCatalog.
+    /// Bron van de beschikbare automatiseringen: leest Config/automations.json,
+    /// met dezelfde fallback-aanpak als UpgradeCatalog bij een ontbrekend of
+    /// corrupt bestand.
     /// </summary>
     public static class AutomationCatalog
     {
-        public static List<Automation> CreateDefault()
+        public static bool TryLoad(out List<Automation> automations, out string? error)
+        {
+            try
+            {
+                automations = ContentLoader.LoadList<Automation>("automations.json");
+                error = null;
+                return true;
+            }
+            catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException)
+            {
+                automations = CreateFallbackDefaults();
+                error = ex.Message;
+                return false;
+            }
+        }
+
+        private static List<Automation> CreateFallbackDefaults()
         {
             return new List<Automation>
             {
@@ -20,15 +41,6 @@ namespace Idlegame.Models
                     Cost = 50,
                     ProductionPerTick = 1.0,
                     IntervalSeconds = 3.0
-                },
-                new Automation
-                {
-                    Id = "robotarm",
-                    Name = "Robotarm",
-                    Description = "Een krachtige arm die in hoog tempo grote hoeveelheden produceert.",
-                    Cost = 300,
-                    ProductionPerTick = 5.0,
-                    IntervalSeconds = 4.0
                 }
             };
         }
