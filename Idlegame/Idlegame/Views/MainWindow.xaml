@@ -5,13 +5,14 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:vm="clr-namespace:Idlegame.ViewModels"
         mc:Ignorable="d"
-        Title="Idlegame" Height="560" Width="1200">
+        Title="Idlegame" Height="560" Width="1550">
     <Window.DataContext>
         <vm:MainViewModel />
     </Window.DataContext>
     <Grid Margin="16">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="260" />
+            <ColumnDefinition Width="*" />
             <ColumnDefinition Width="*" />
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
@@ -127,6 +128,49 @@
                     </ItemsControl>
                 </ScrollViewer>
             </Border>
+        </DockPanel>
+
+        <DockPanel Grid.Column="3" Margin="16,0,0,0">
+            <TextBlock DockPanel.Dock="Top" Text="Winkel" FontSize="20" FontWeight="Bold" Margin="0,0,0,8" />
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <ItemsControl ItemsSource="{Binding ShopItems}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="4" Padding="10" Margin="0,0,0,8">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock FontWeight="Bold" FontSize="14">
+                                            <Run Text="{Binding Name, Mode=OneWay}" />
+                                            <Run Text=" (" />
+                                            <Run Text="{Binding Quantity, Mode=OneWay}" />
+                                            <Run Text=")" />
+                                        </TextBlock>
+                                        <TextBlock Text="{Binding Description}" FontSize="12" Opacity="0.8" TextWrapping="Wrap" />
+                                        <TextBlock FontSize="12" Margin="0,4,0,0">
+                                            <Run Text="Prijs: " />
+                                            <Run Text="{Binding CostDisplay, Mode=OneWay}" />
+                                            <Run Text="  |  " />
+                                            <Run Text="{Binding ProductionDisplay, Mode=OneWay}" />
+                                        </TextBlock>
+                                        <TextBlock Text="{Binding StatusText}" FontSize="11" Foreground="Gray" Margin="0,2,0,0" />
+                                    </StackPanel>
+                                    <Button Grid.Column="1"
+                                            Content="Koop"
+                                            Command="{Binding BuyCommand}"
+                                            AutomationProperties.Name="{Binding Name, StringFormat='Koop {0}'}"
+                                            VerticalAlignment="Center"
+                                            Padding="12,6"
+                                            Margin="10,0,0,0" />
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
         </DockPanel>
     </Grid>
 </Window>

@@ -33,6 +33,9 @@ namespace Idlegame.ViewModels
                 AutomationCatalog.CreateDefault().Select(automation =>
                     new AutomationViewModel(automation, TryPurchaseAutomation, OnAutomationProduce)));
 
+            ShopItems = new ObservableCollection<ShopItemViewModel>(
+                ShopCatalog.CreateDefault().Select(shopItem => new ShopItemViewModel(shopItem, TryPurchaseShopItem)));
+
             ActivityLog = new ObservableCollection<string>();
 
             UpdateDisplays();
@@ -45,6 +48,8 @@ namespace Idlegame.ViewModels
         public ObservableCollection<UpgradeViewModel> Upgrades { get; }
 
         public ObservableCollection<AutomationViewModel> Automations { get; }
+
+        public ObservableCollection<ShopItemViewModel> ShopItems { get; }
 
         public ObservableCollection<string> ActivityLog { get; }
 
@@ -68,7 +73,7 @@ namespace Idlegame.ViewModels
 
         private void OnGameTick(double elapsedSeconds)
         {
-            _gameState.Currency += _gameState.IncomePerSecond * elapsedSeconds;
+            _gameState.Currency += GetContinuousIncomePerSecond() * elapsedSeconds;
             UpdateDisplays();
             RefreshAffordability();
         }
@@ -133,10 +138,27 @@ namespace Idlegame.ViewModels
             RefreshAffordability();
         }
 
+        private void TryPurchaseShopItem(ShopItemViewModel shopItem)
+        {
+            if (!shopItem.CanPurchase)
+            {
+                return;
+            }
+
+            _gameState.Currency -= shopItem.Model.CurrentCost;
+            shopItem.ApplyPurchase();
+
+            AddLogEntry($"'{shopItem.Name}' gekocht (aantal: {shopItem.Quantity})");
+
+            UpdateDisplays();
+            RefreshAffordability();
+        }
+
         private void RefreshAffordability()
         {
             RefreshUpgradeStates();
             RefreshAutomationStates();
+            RefreshShopStates();
         }
 
         private void RefreshUpgradeStates()
@@ -184,6 +206,16 @@ namespace Idlegame.ViewModels
             }
         }
 
+        private void RefreshShopStates()
+        {
+            foreach (var shopItem in ShopItems)
+            {
+                bool canAfford = _gameState.Currency >= shopItem.Model.CurrentCost;
+                shopItem.CanPurchase = canAfford;
+                shopItem.StatusText = canAfford ? string.Empty : "Onvoldoende valuta";
+            }
+        }
+
         private void AddLogEntry(string message)
         {
             ActivityLog.Insert(0, $"{DateTime.Now:HH:mm:ss} - {message}");
@@ -194,12 +226,24 @@ namespace Idlegame.ViewModels
             }
         }
 
+        /// <summary>
+        /// Inkomen/sec dat doorlopend (elke gameloop-tick) wordt bijgeteld:
+        /// basisinkomen + upgrades + bezeten winkel-items. Automatiseringen
+        /// tellen hier niet in mee, want die produceren discreet op hun eigen
+        /// timer (zie OnAutomationProduce).
+        /// </summary>
+        private double GetContinuousIncomePerSecond()
+        {
+            double shopRate = ShopItems.Sum(s => s.Model.Quantity * s.Model.IncomePerSecondPerUnit);
+            return _gameState.IncomePerSecond + shopRate;
+        }
+
         private void UpdateDisplays()
         {
             double automationRate = Automations
                 .Where(a => a.IsUnlocked)
                 .Sum(a => a.Model.ProductionPerTick / a.Model.IntervalSeconds);
-            double totalIncomePerSecond = _gameState.IncomePerSecond + automationRate;
+            double totalIncomePerSecond = GetContinuousIncomePerSecond() + automationRate;
 
             CurrencyDisplay = _gameState.Currency.ToString("N1", CultureInfo.InvariantCulture);
             IncomePerSecondDisplay = totalIncomePerSecond.ToString("N1", CultureInfo.InvariantCulture);
